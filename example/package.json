@@ -1,0 +1,12 @@
+{
+  "name": "convex-secret-manager-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev"
+  },
+  "dependencies": {
+    "convex": "^1.42.0",
+    "convex-secret-manager": "file:.."
+  }
+}

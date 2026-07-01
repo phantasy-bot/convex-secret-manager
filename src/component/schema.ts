@@ -9,10 +9,14 @@ export default defineSchema({
     ciphertext: v.string(),
     preview: v.string(),
     version: v.number(),
+    keyVersion: v.optional(v.number()),
     metadata: v.optional(v.any()),
+    expiresAt: v.optional(v.number()),
     updatedAt: v.number(),
     createdAt: v.number(),
-  }).index("by_owner_namespace_name", ["ownerId", "namespace", "name"]),
+  })
+    .index("by_owner_namespace_name", ["ownerId", "namespace", "name"])
+    .index("by_key_version", ["keyVersion"]),
 
   vaultSecretVersions: defineTable({
     ownerId: v.string(),
@@ -40,12 +44,15 @@ export default defineSchema({
     lastUsedAt: v.optional(v.number()),
     graceExpiresAt: v.optional(v.number()),
     replacedKeyId: v.optional(v.id("issuedKeys")),
+    revokedAt: v.optional(v.number()),
+    revocationReason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_hash", ["tokenHash"])
     .index("by_owner", ["ownerId", "namespace"])
-    .index("by_owner_status", ["ownerId", "namespace", "status"]),
+    .index("by_owner_status", ["ownerId", "namespace", "status"])
+    .index("by_status", ["status"]),
 
   auditEvents: defineTable({
     ownerId: v.string(),
@@ -55,5 +62,7 @@ export default defineSchema({
     actorId: v.optional(v.string()),
     metadata: v.optional(v.any()),
     createdAt: v.number(),
-  }).index("by_owner_time", ["ownerId", "createdAt"]),
+  })
+    .index("by_owner_time", ["ownerId", "createdAt"])
+    .index("by_owner_namespace_time", ["ownerId", "namespace", "createdAt"]),
 });

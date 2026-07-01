@@ -7,5 +7,12 @@ export {
   generateIssuedToken,
   hashToken,
   isEncryptedSecret,
+  defineKeys,
+  parseDefinedKeys,
+  activeKeyVersion,
+  isSecretManagerError,
+  secretManagerError,
+  SECRET_MANAGER_ERROR_CODES,
 } from "./crypto.js";
+export type { SecretManagerErrorCode, SecretManagerErrorData } from "./crypto.js";
 export * from "../shared.js";

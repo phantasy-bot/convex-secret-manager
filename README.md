@@ -4,14 +4,27 @@ Convex component for **encrypted secret vaults** and **issued API key lifecycle*
 
 Directory slug: `/secret-manager`
 
+Combines [gaganref/convex-secret-store](https://www.convex.dev/components/convex-secret-store) and [gaganref/convex-api-keys](https://www.convex.dev/components/convex-api-keys) into one **agent-runtime** package with per-`ownerId` tenancy.
+
 ## Two modules
 
 | Module | Use |
 |--------|-----|
 | **Vault** | Store user-supplied credentials (OpenAI, Venice, webhooks) encrypted at rest |
-| **Issued keys** | Issue `sm_` machine tokens with hash-only storage, revoke, and audit |
+| **Issued keys** | Issue `sm_` machine tokens with hash-only storage, refresh, revoke, and audit |
 
-Unlike `convex-api-keys` community components, the vault is first-class for third-party secrets.
+## vs gaganref
+
+| | gaganref (2 packages) | `convex-secret-manager` |
+|--|----------------------|-------------------------|
+| Path model | `namespace` + `name` | `ownerId` + `namespace` + `name` |
+| Use case | Generic apps | Multi-agent / companion runtimes |
+| Install | Two components | One component |
+| Vault crypto | Envelope + KEK rotation | Envelope (`defineKeys`) + legacy single-key |
+| Issued validate | Query (side-effect free) | Query |
+| Sweeps | Hourly crons | Hourly crons (built-in) |
+
+Use gaganref when you need only one concern and maximum standalone maturity. Use this package when agents own both third-party secrets and issued machine tokens.
 
 ## Install
 
@@ -21,10 +34,25 @@ npm install convex-secret-manager
 
 ```ts
 // convex/convex.config.ts
+import { defineApp } from "convex/server";
+import { v } from "convex/values";
+import { defineKeys } from "convex-secret-manager";
 import secretManager from "convex-secret-manager/convex.config.js";
 
-const app = defineApp();
-app.use(secretManager);
+const app = defineApp({
+  env: {
+    MY_APP_KEK_V1: v.string(),
+  },
+});
+
+app.use(secretManager, {
+  env: {
+    SECRET_MANAGER_KEYS: defineKeys({
+      1: process.env.MY_APP_KEK_V1!,
+    }),
+  },
+});
+
 export default app;
 ```
 
@@ -33,18 +61,17 @@ export default app;
 import { SecretManager } from "convex-secret-manager";
 import { components } from "./_generated/api.js";
 
-export const secretManager = new SecretManager(components.secretManager, {
-  encryptionKey: process.env.SECRET_MANAGER_ENCRYPTION_KEY,
-});
+export const secretManager = new SecretManager(components.secretManager);
 ```
 
 Set on the Convex deployment:
 
 ```env
+SECRET_MANAGER_KEYS=1:<kek-material>
+# or legacy:
 SECRET_MANAGER_ENCRYPTION_KEY=...
+PHANTASY_SECRET_ENCRYPTION_KEY=...  # Phantasy alias
 ```
-
-Phantasy deployments may alias `PHANTASY_SECRET_ENCRYPTION_KEY`.
 
 ## Vault paths
 
@@ -53,6 +80,28 @@ ownerId   = agentId | deployment | orgId
 namespace = providers | integrations | party-quest | extensions
 name      = venice.apiKey
 ```
+
+## Issued keys API (parity highlights)
+
+- `issued.create` / `validate` (query) / `touch` / `revoke` / `revokeAll`
+- `issued.refresh` — rotate with grace period
+- `issued.update` / `getKey` / `list` (paginated + `effectiveStatus`)
+- Hourly sweep crons for expired and idle keys
+- `cleanupKeys` / `cleanupEvents` internal jobs
+
+## Vault API (parity highlights)
+
+- `vault.putPlaintext` — component-side envelope encryption with AAD
+- `vault.getResult` — `{ ok, value } | { ok: false, reason }`
+- `vault.update` — metadata/TTL without re-encrypt
+- `vault.list` — paginated with `effectiveState`
+- `auditEvents.listEvents` — paginated audit trail
+- `vaultRotate.rotate` / `isRotationComplete` — KEK rotation drain
+- `vaultCleanup.cleanupSecrets` — expired secret cleanup
+
+## Example
+
+See [`example/`](./example/) for a minimal Convex + Vite dashboard.
 
 ## License
 

@@ -23,6 +23,7 @@ type RunActionCtx = Pick<
 export type SecretManagerOptions = {
   encryptionKey?: string;
   issuedTokenPrefix?: string;
+  useComponentEncryption?: boolean;
 };
 
 type VaultStoreArgs = {
@@ -32,6 +33,7 @@ type VaultStoreArgs = {
   plaintext: string;
   actorId?: string;
   metadata?: unknown;
+  ttlMs?: number | null;
 };
 
 type VaultPathArgs = {
@@ -39,6 +41,8 @@ type VaultPathArgs = {
   namespace: string;
   name: string;
 };
+
+type PaginationOpts = { numItems: number; cursor: string | null };
 
 type IssuedCreateArgs = {
   ownerId: string;
@@ -49,6 +53,9 @@ type IssuedCreateArgs = {
   metadata?: unknown;
   expiresAt?: number;
   maxIdleMs?: number;
+  ttlMs?: number;
+  idleTimeoutMs?: number;
+  prefix?: string;
 };
 
 export class SecretManager {
@@ -63,9 +70,9 @@ export class SecretManager {
       process.env.SECRET_MANAGER_ENCRYPTION_KEY?.trim() ||
       process.env.PHANTASY_SECRET_ENCRYPTION_KEY?.trim() ||
       "";
-    if (!key) {
+    if (!key && !process.env.SECRET_MANAGER_KEYS?.trim()) {
       throw new Error(
-        "SECRET_MANAGER_ENCRYPTION_KEY or PHANTASY_SECRET_ENCRYPTION_KEY must be configured",
+        "SECRET_MANAGER_KEYS, SECRET_MANAGER_ENCRYPTION_KEY, or PHANTASY_SECRET_ENCRYPTION_KEY must be configured",
       );
     }
     return key;
@@ -73,7 +80,24 @@ export class SecretManager {
 
   vault = {
     store: async (ctx: RunMutationCtx, args: VaultStoreArgs) => {
-      const ciphertext = await encryptSecretValue(args.plaintext, this.resolveEncryptionKey());
+      if (this.options.useComponentEncryption !== false) {
+        return ctx.runMutation(this.component.vault.putPlaintext, {
+          ownerId: args.ownerId,
+          namespace: args.namespace,
+          name: args.name,
+          plaintext: args.plaintext,
+          ttlMs: args.ttlMs,
+          actorId: args.actorId,
+          metadata: args.metadata,
+        });
+      }
+
+      const encryptionKey = this.resolveEncryptionKey();
+      const ciphertext = await encryptSecretValue(args.plaintext, encryptionKey, {
+        ownerId: args.ownerId,
+        namespace: args.namespace,
+        name: args.name,
+      });
       const preview = buildSecretPreview(args.plaintext);
       return ctx.runMutation(this.component.vault.store, {
         ownerId: args.ownerId,
@@ -83,8 +107,12 @@ export class SecretManager {
         preview,
         actorId: args.actorId,
         metadata: args.metadata,
+        expiresAt: args.ttlMs ? Date.now() + args.ttlMs : undefined,
       });
     },
+
+    get: async (ctx: RunQueryCtx, args: VaultPathArgs) =>
+      ctx.runQuery(this.component.vault.getResult, args),
 
     getPlaintext: async (
       ctx: RunQueryCtx | RunActionCtx | RunMutationCtx,
@@ -94,19 +122,49 @@ export class SecretManager {
       if (!runQuery) {
         throw new Error("getPlaintext requires a context with runQuery");
       }
-      const record = (await runQuery(this.component.vault.get, args)) as {
-        ciphertext: string;
-      } | null;
-      if (!record) {
+      const result = (await runQuery(this.component.vault.getResult, args)) as
+        | { ok: true; value: string }
+        | { ok: false; reason: string }
+        | null;
+      if (!result || !result.ok) {
         return null;
       }
-      return decryptSecretValue(record.ciphertext, this.resolveEncryptionKey());
+      return result.value;
     },
+
+    update: async (
+      ctx: RunMutationCtx,
+      args: VaultPathArgs & {
+        metadata?: unknown | null;
+        ttlMs?: number | null;
+        actorId?: string;
+      },
+    ) =>
+      ctx.runMutation(this.component.vault.update, {
+        ownerId: args.ownerId,
+        namespace: args.namespace,
+        name: args.name,
+        metadata: args.metadata,
+        ttlMs: args.ttlMs,
+        actorId: args.actorId,
+      }),
 
     list: async (
       ctx: RunQueryCtx,
-      args: { ownerId: string; namespace?: string },
+      args: { ownerId: string; namespace?: string; paginationOpts: PaginationOpts },
     ) => ctx.runQuery(this.component.vault.list, args),
+
+    listEvents: async (
+      ctx: RunQueryCtx,
+      args: {
+        ownerId: string;
+        namespace?: string;
+        targetName?: string;
+        action?: string;
+        paginationOpts: PaginationOpts;
+        order?: "asc" | "desc";
+      },
+    ) => ctx.runQuery(this.component.auditEvents.listEvents, args),
 
     delete: async (
       ctx: RunMutationCtx,
@@ -121,9 +179,13 @@ export class SecretManager {
 
   issued = {
     create: async (ctx: RunMutationCtx, args: IssuedCreateArgs) => {
-      const prefix = this.options.issuedTokenPrefix ?? "sm_";
+      const prefix = args.prefix ?? this.options.issuedTokenPrefix ?? "sm_";
       const { token, tokenPrefix, tokenLast4 } = generateIssuedToken(prefix);
       const tokenHash = await hashToken(token);
+      const expiresAt =
+        args.expiresAt ??
+        (args.ttlMs ? Date.now() + args.ttlMs : undefined);
+      const maxIdleMs = args.maxIdleMs ?? args.idleTimeoutMs;
       const result = await ctx.runMutation(this.component.issuedKeys.create, {
         ownerId: args.ownerId,
         namespace: args.namespace,
@@ -134,15 +196,64 @@ export class SecretManager {
         actorId: args.actorId,
         permissions: args.permissions,
         metadata: args.metadata,
-        expiresAt: args.expiresAt,
-        maxIdleMs: args.maxIdleMs,
+        expiresAt,
+        maxIdleMs,
       });
-      return { ...result, token, tokenPrefix, tokenLast4 };
+      return { ...result, token, tokenPrefix, tokenLast4, expiresAt };
     },
 
-    validate: async (ctx: RunMutationCtx, token: string) => {
+    validate: async (ctx: RunQueryCtx, token: string) => {
       const tokenHash = await hashToken(token);
-      return ctx.runMutation(this.component.issuedKeys.validate, { tokenHash });
+      return ctx.runQuery(this.component.issuedKeys.validate, { tokenHash });
+    },
+
+    getKey: async (
+      ctx: RunQueryCtx,
+      args: { keyId: string; ownerId: string },
+    ) => ctx.runQuery(this.component.issuedKeys.getKey, args),
+
+    update: async (
+      ctx: RunMutationCtx,
+      args: {
+        keyId: string;
+        ownerId: string;
+        name?: string;
+        metadata?: unknown | null;
+        expiresAt?: number | null;
+        maxIdleMs?: number | null;
+        actorId?: string;
+      },
+    ) => ctx.runMutation(this.component.issuedKeys.update, args),
+
+    refresh: async (
+      ctx: RunMutationCtx,
+      args: {
+        keyId: string;
+        ownerId: string;
+        actorId?: string;
+        graceMs?: number;
+        prefix?: string;
+      },
+    ) => {
+      const prefix = args.prefix ?? this.options.issuedTokenPrefix ?? "sm_";
+      const { token, tokenPrefix, tokenLast4 } = generateIssuedToken(prefix);
+      const tokenHash = await hashToken(token);
+      const result = await ctx.runMutation(this.component.issuedKeys.refresh, {
+        keyId: args.keyId as never,
+        ownerId: args.ownerId,
+        tokenHash,
+        tokenPrefix,
+        tokenLast4,
+        actorId: args.actorId,
+        graceMs: args.graceMs,
+        prefix,
+      });
+      return {
+        ...(result as Record<string, unknown>),
+        token,
+        tokenPrefix,
+        tokenLast4,
+      };
     },
 
     touch: async (
@@ -167,12 +278,18 @@ export class SecretManager {
 
     revokeAll: async (
       ctx: RunMutationCtx,
-      args: { ownerId: string; namespace: string; actorId?: string },
+      args: { ownerId: string; namespace: string; before?: number; actorId?: string },
     ) => ctx.runMutation(this.component.issuedKeys.revokeAll, args),
 
     list: async (
       ctx: RunQueryCtx,
-      args: { ownerId: string; namespace?: string },
+      args: {
+        ownerId: string;
+        namespace?: string;
+        effectiveStatus?: string;
+        paginationOpts: PaginationOpts;
+        order?: "asc" | "desc";
+      },
     ) => ctx.runQuery(this.component.issuedKeys.list, args),
   };
 }
