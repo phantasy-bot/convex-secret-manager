@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/phantasy-bot/secret-manager.git"
+    "url": "git+https://forgejo.phantasy.bot/phantasy/secret-manager.git"
   },
   "keywords": [
     "convex",
@@ -42,7 +42,9 @@
     "build": "tsc --project tsconfig.build.json",
     "build:codegen": "npx convex codegen --component-dir ./src/component && npm run build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "convex": "^1.42.0"
@@ -54,5 +56,10 @@
     "convex-test": "^0.0.36",
     "typescript": "~5.8.3",
     "vitest": "^3.2.4"
+  },
+  "homepage": "https://forgejo.phantasy.bot/phantasy/secret-manager",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   }
 }
