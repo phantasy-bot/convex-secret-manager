@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://forgejo.phantasy.bot/phantasy/secret-manager.git"
+    "url": "git+https://forgejo.thomasjvu.com/phantasy/secret-manager.git"
   },
   "keywords": [
     "convex",
@@ -57,7 +57,7 @@
     "typescript": "~5.8.3",
     "vitest": "^3.2.4"
   },
-  "homepage": "https://forgejo.phantasy.bot/phantasy/secret-manager",
+  "homepage": "https://forgejo.thomasjvu.com/phantasy/secret-manager",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org"
