@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalQuery, mutation, query } from "./_generated/server.js";
+import { mutation, query } from "./_generated/server.js";
 import { writeAuditEvent } from "./audit.js";
 import {
   paginationOptsArgs,
@@ -193,7 +193,8 @@ export const update = mutation({
   },
 });
 
-export const get = internalQuery({
+/** Public so app-side crypto (useComponentEncryption: false) can read ciphertext. */
+export const get = query({
   args: vaultPathArgs,
   returns: v.union(
     v.object({
