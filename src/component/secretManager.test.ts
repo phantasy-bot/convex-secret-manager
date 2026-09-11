@@ -54,21 +54,21 @@ describe("secret-manager component", () => {
     const t = convexTest(schema, modules);
 
     await t.mutation(putPlaintext, {
-      ownerId: "agent-1",
+      ownerId: "org-1",
       namespace: "providers",
-      name: "venice.apiKey",
-      plaintext: "venice-secret-key-1234567890",
+      name: "openai.apiKey",
+      plaintext: "sk-test-secret-key-1234567890",
     });
 
     const result = await t.query(getResult, {
-      ownerId: "agent-1",
+      ownerId: "org-1",
       namespace: "providers",
-      name: "venice.apiKey",
+      name: "openai.apiKey",
     });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value).toBe("venice-secret-key-1234567890");
+      expect(result.value).toBe("sk-test-secret-key-1234567890");
     }
   });
 
@@ -77,7 +77,7 @@ describe("secret-manager component", () => {
     const tokenHash = "abc123hash";
 
     const created = await t.mutation(createKey, {
-      ownerId: "agent-1",
+      ownerId: "org-1",
       namespace: "workflows",
       name: "callback",
       tokenHash,
@@ -90,7 +90,7 @@ describe("secret-manager component", () => {
 
     await t.mutation(revokeKey, {
       keyId: created.keyId as never,
-      ownerId: "agent-1",
+      ownerId: "org-1",
     });
 
     const afterRevoke = await t.query(validateKey, { tokenHash });
