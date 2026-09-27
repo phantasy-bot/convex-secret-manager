@@ -68,11 +68,10 @@ export class SecretManager {
     const key =
       this.options.encryptionKey?.trim() ||
       process.env.SECRET_MANAGER_ENCRYPTION_KEY?.trim() ||
-      process.env.PHANTASY_SECRET_ENCRYPTION_KEY?.trim() ||
       "";
     if (!key && !process.env.SECRET_MANAGER_KEYS?.trim()) {
       throw new Error(
-        "SECRET_MANAGER_KEYS, SECRET_MANAGER_ENCRYPTION_KEY, or PHANTASY_SECRET_ENCRYPTION_KEY must be configured",
+        "SECRET_MANAGER_KEYS or SECRET_MANAGER_ENCRYPTION_KEY must be configured",
       );
     }
     return key;

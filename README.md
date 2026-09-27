@@ -2,9 +2,7 @@
 
 Convex component for **encrypted secret vaults** and **issued API key lifecycle**.
 
-Directory slug: `/secret-manager`
-
-Combines [gaganref/convex-secret-store](https://www.convex.dev/components/convex-secret-store) and [gaganref/convex-api-keys](https://www.convex.dev/components/convex-api-keys) into one **agent-runtime** package with per-`ownerId` tenancy.
+Combines the roles of [gaganref/convex-secret-store](https://www.convex.dev/components/convex-secret-store) and [gaganref/convex-api-keys](https://www.convex.dev/components/convex-api-keys) into one package with per-`ownerId` tenancy. Any Convex app can use it (SaaS orgs, agents, multi-tenant backends).
 
 ## Two modules
 
@@ -18,13 +16,13 @@ Combines [gaganref/convex-secret-store](https://www.convex.dev/components/convex
 | | gaganref (2 packages) | `convex-secret-manager` |
 |--|----------------------|-------------------------|
 | Path model | `namespace` + `name` | `ownerId` + `namespace` + `name` |
-| Use case | Generic apps | Multi-agent / companion runtimes |
+| Use case | Generic apps | Multi-tenant backends that issue keys too |
 | Install | Two components | One component |
 | Vault crypto | Envelope + KEK rotation | Envelope (`defineKeys`) + legacy single-key |
 | Issued validate | Query (side-effect free) | Query |
 | Sweeps | Hourly crons | Hourly crons (built-in) |
 
-Use gaganref when you need only one concern and maximum standalone maturity. Use this package when agents own both third-party secrets and issued machine tokens.
+Use gaganref when you need only one concern. Use this package when one owner should hold both third-party credentials and issued machine tokens.
 
 ## Install
 
@@ -68,17 +66,16 @@ Set on the Convex deployment:
 
 ```env
 SECRET_MANAGER_KEYS=1:<kek-material>
-# or legacy:
+# or legacy single key:
 SECRET_MANAGER_ENCRYPTION_KEY=...
-PHANTASY_SECRET_ENCRYPTION_KEY=...  # Phantasy alias
 ```
 
 ## Vault paths
 
 ```text
-ownerId   = agentId | deployment | orgId
-namespace = providers | integrations | party-quest | extensions
-name      = venice.apiKey
+ownerId   = orgId | userId | deployment
+namespace = providers | integrations | webhooks
+name      = openai.apiKey
 ```
 
 ## Issued keys API (parity highlights)

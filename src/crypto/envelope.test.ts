@@ -7,7 +7,7 @@ describe("envelope crypto", () => {
     const keys = defineKeys({ 1: "test-kek-material-32chars-minimum!!" });
     const encrypted = await encryptSecret(
       "provider-api-key-value",
-      buildAad("agent-1", "providers", "venice.apiKey"),
+      buildAad("org-1", "providers", "openai.apiKey"),
       keys,
     );
     expect(isEnvelopeSecret(encrypted.ciphertext)).toBe(true);
@@ -15,7 +15,7 @@ describe("envelope crypto", () => {
 
     const decrypted = await decryptSecret(
       encrypted.ciphertext,
-      buildAad("agent-1", "providers", "venice.apiKey"),
+      buildAad("org-1", "providers", "openai.apiKey"),
       keys,
     );
     expect(decrypted).toBe("provider-api-key-value");

@@ -9,10 +9,7 @@ export function resolveKeysSerialized(): string | undefined {
 }
 
 export function resolveFallbackKey(): string | undefined {
-  return (
-    process.env.SECRET_MANAGER_ENCRYPTION_KEY?.trim() ||
-    process.env.PHANTASY_SECRET_ENCRYPTION_KEY?.trim()
-  );
+  return process.env.SECRET_MANAGER_ENCRYPTION_KEY?.trim();
 }
 
 export function resolveExpiresAt(ttlMs: number | null | undefined, now: number): number | undefined {

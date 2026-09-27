@@ -56,10 +56,7 @@ export function resolveEncryptionMaterial(
     return { mode: "envelope", version, material };
   }
   const material =
-    fallbackKey?.trim() ||
-    process.env.SECRET_MANAGER_ENCRYPTION_KEY?.trim() ||
-    process.env.PHANTASY_SECRET_ENCRYPTION_KEY?.trim() ||
-    "";
+    fallbackKey?.trim() || process.env.SECRET_MANAGER_ENCRYPTION_KEY?.trim() || "";
   if (!material) {
     throw new Error("SECRET_MANAGER_KEYS or SECRET_MANAGER_ENCRYPTION_KEY must be configured");
   }
