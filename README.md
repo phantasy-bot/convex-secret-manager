@@ -70,6 +70,18 @@ SECRET_MANAGER_KEYS=1:<kek-material>
 SECRET_MANAGER_ENCRYPTION_KEY=...
 ```
 
+## Self-hosted Convex app-side encryption
+
+When component functions cannot read the host deployment's environment, perform encryption and decryption inside trusted host functions:
+
+```ts
+export const secretManager = new SecretManager(components.secretManager, {
+  useComponentEncryption: false,
+});
+```
+
+The host deployment must provide `SECRET_MANAGER_ENCRYPTION_KEY` or `SECRET_MANAGER_KEYS`. This mode stores only ciphertext in the component. Its ciphertext lookup is a public component query; expose it only through host functions that enforce application authorization, never directly to untrusted clients.
+
 ## Vault paths
 
 ```text
