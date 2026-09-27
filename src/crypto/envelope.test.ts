@@ -51,6 +51,17 @@ describe("envelope crypto", () => {
       await expect(decryptSecret(first.ciphertext, aad, undefined, fallbackKey)).resolves.toBe(
         "same secret",
       );
+
+      const keys = defineKeys({ 1: "test-kek-material-32chars-minimum!!" });
+      const envelopeFirst = await encryptSecret("same secret", aad, keys);
+      const envelopeSecond = await encryptSecret("same secret", aad, keys);
+      const firstParts = envelopeFirst.ciphertext.split(":");
+      const secondParts = envelopeSecond.ciphertext.split(":");
+
+      expect(envelopeFirst.keyVersion).toBe(1);
+      expect(firstParts[3]).not.toBe(secondParts[3]);
+      expect(firstParts[5]).not.toBe(secondParts[5]);
+      await expect(decryptSecret(envelopeFirst.ciphertext, aad, keys)).resolves.toBe("same secret");
     } finally {
       cryptoRandom.mockRestore();
       random.mockRestore();
