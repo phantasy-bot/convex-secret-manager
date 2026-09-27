@@ -64,15 +64,15 @@ export function resolveEncryptionMaterial(
 }
 
 /**
- * Convex mutations forbid crypto.getRandomValues / Math.random.
- * AES-GCM only requires IV uniqueness per key — derive from aad + wall clock + length.
+ * Convex mutations reject crypto.getRandomValues but provide a seeded strong
+ * PRNG through Math.random. Use it for the 96-bit AES-GCM IV in that runtime.
  */
-async function mutationSafeIv(seed: string): Promise<Uint8Array> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(seed),
-  );
-  return new Uint8Array(digest).slice(0, 12);
+function mutationSafeIv(): Uint8Array {
+  const iv = new Uint8Array(12);
+  for (let index = 0; index < iv.length; index += 1) {
+    iv[index] = Math.floor(Math.random() * 256);
+  }
+  return iv;
 }
 
 export async function encryptSecret(
@@ -90,8 +90,8 @@ export async function encryptSecret(
     try {
       iv = crypto.getRandomValues(new Uint8Array(12));
     } catch {
-      // Mutations / self-hosted isolates: no CSPRNG — unique-enough IV via SHA-256
-      iv = await mutationSafeIv(`${aad}\0${Date.now()}\0${plaintext.length}\0${plaintext.slice(0, 64)}`);
+      // Convex's mutation-safe PRNG supplies unpredictable, retry-stable IVs.
+      iv = mutationSafeIv();
     }
     const encrypted = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
