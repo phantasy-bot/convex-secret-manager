@@ -63,16 +63,17 @@ export function resolveEncryptionMaterial(
   return { mode: "legacy", material };
 }
 
-/**
- * Convex mutations reject crypto.getRandomValues but provide a seeded strong
- * PRNG through Math.random. Use it for the 96-bit AES-GCM IV in that runtime.
- */
-function mutationSafeIv(): Uint8Array {
-  const iv = new Uint8Array(12);
-  for (let index = 0; index < iv.length; index += 1) {
-    iv[index] = Math.floor(Math.random() * 256);
+/** Convex mutations provide a seeded strong PRNG when Web Crypto randomness is unavailable. */
+function randomBytes(length: number): Uint8Array {
+  try {
+    return crypto.getRandomValues(new Uint8Array(length));
+  } catch {
+    const bytes = new Uint8Array(length);
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+    return bytes;
   }
-  return iv;
 }
 
 export async function encryptSecret(
@@ -86,13 +87,7 @@ export async function encryptSecret(
 
   if (resolved.mode === "legacy") {
     const key = await importMaterial(resolved.material);
-    let iv: Uint8Array;
-    try {
-      iv = crypto.getRandomValues(new Uint8Array(12));
-    } catch {
-      // Convex's mutation-safe PRNG supplies unpredictable, retry-stable IVs.
-      iv = mutationSafeIv();
-    }
+    const iv = randomBytes(12);
     const encrypted = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
       key,
@@ -104,13 +99,13 @@ export async function encryptSecret(
   }
 
   const kek = await importMaterial(resolved.material);
-  const dek = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, [
+  const dekRaw = randomBytes(32);
+  const dek = await crypto.subtle.importKey("raw", dekRaw, "AES-GCM", true, [
     "encrypt",
     "decrypt",
   ]);
-  const dekRaw = new Uint8Array(await crypto.subtle.exportKey("raw", dek));
-  const dataIv = crypto.getRandomValues(new Uint8Array(12));
-  const dekIv = crypto.getRandomValues(new Uint8Array(12));
+  const dataIv = randomBytes(12);
+  const dekIv = randomBytes(12);
   const aadBytes = new TextEncoder().encode(aad);
 
   const encryptedPayload = await crypto.subtle.encrypt(
