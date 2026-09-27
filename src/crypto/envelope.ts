@@ -63,6 +63,18 @@ export function resolveEncryptionMaterial(
   return { mode: "legacy", material };
 }
 
+/**
+ * Convex mutations reject crypto.getRandomValues but provide a seeded strong
+ * PRNG through Math.random. Use it for the 96-bit AES-GCM IV in that runtime.
+ */
+function mutationSafeIv(): Uint8Array {
+  const iv = new Uint8Array(12);
+  for (let index = 0; index < iv.length; index += 1) {
+    iv[index] = Math.floor(Math.random() * 256);
+  }
+  return iv;
+}
+
 export async function encryptSecret(
   plaintext: string,
   aad: string,
@@ -74,7 +86,13 @@ export async function encryptSecret(
 
   if (resolved.mode === "legacy") {
     const key = await importMaterial(resolved.material);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
+    let iv: Uint8Array;
+    try {
+      iv = crypto.getRandomValues(new Uint8Array(12));
+    } catch {
+      // Convex's mutation-safe PRNG supplies unpredictable, retry-stable IVs.
+      iv = mutationSafeIv();
+    }
     const encrypted = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
       key,

@@ -121,6 +121,30 @@ export class SecretManager {
       if (!runQuery) {
         throw new Error("getPlaintext requires a context with runQuery");
       }
+
+      // App-side decrypt: component isolates on self-hosted Convex do not receive
+      // deployment env (SECRET_MANAGER_*), so getResult cannot decrypt there.
+      if (this.options.useComponentEncryption === false) {
+        const record = (await runQuery(this.component.vault.get, args)) as
+          | {
+              ciphertext: string;
+              expiresAt?: number;
+            }
+          | null;
+        if (!record) {
+          return null;
+        }
+        if (record.expiresAt && record.expiresAt <= Date.now()) {
+          return null;
+        }
+        const encryptionKey = this.resolveEncryptionKey();
+        return decryptSecretValue(record.ciphertext, encryptionKey, {
+          ownerId: args.ownerId,
+          namespace: args.namespace,
+          name: args.name,
+        });
+      }
+
       const result = (await runQuery(this.component.vault.getResult, args)) as
         | { ok: true; value: string }
         | { ok: false; reason: string }
