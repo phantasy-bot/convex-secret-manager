@@ -51,11 +51,11 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "^4.0.4",
-    "@types/node": "^20.19.43",
+    "@types/node": "^22.20.5",
     "convex": "^1.42.0",
     "convex-test": "^0.0.36",
     "typescript": "~5.8.3",
-    "vitest": "^3.2.4"
+    "vitest": "^5.0.3"
   },
   "homepage": "https://github.com/phantasy-bot/convex-secret-manager",
   "publishConfig": {
